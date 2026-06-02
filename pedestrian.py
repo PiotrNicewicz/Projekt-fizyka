@@ -1,0 +1,342 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+# ==========================
+# PARAMETRY MODELU
+# ==========================
+
+N_AGENTS = 50
+
+MASS = 80.0
+
+R = 30
+A = 2000
+B = 15
+
+A_WALL = 10000
+B_WALL = 30
+
+TAU = 0.3
+
+DT = 0.005
+STEPS = 2000
+
+WIDTH = 1100
+HEIGHT = 600
+
+AGENT_RADIUS = 12
+# ==========================
+# AGENT
+# ==========================
+
+class Agent:
+    def __init__(self):
+
+        self.pos = np.array([
+            np.random.uniform(50, WIDTH/2 - 100),
+            np.random.uniform(50, HEIGHT - 50)
+        ])
+
+        self.vel = np.zeros(2)
+
+        self.goal = np.array([
+            WIDTH-100,
+            HEIGHT/2
+        ])
+
+        self.desired_speed = max(
+            30,
+            np.random.normal(120, 40)
+        )
+
+        self.trajectory = [self.pos.copy()]
+
+
+# ==========================
+# ŚCIANY
+# ==========================
+
+DOOR_WIDTH = 40
+
+middle_x = WIDTH / 2
+
+door_bottom = HEIGHT/2 - DOOR_WIDTH/2
+door_top = HEIGHT/2 + DOOR_WIDTH/2
+
+walls = [
+
+    # zewnętrzne
+    [0, 0, 20, HEIGHT],
+    [WIDTH - 20, 0, WIDTH, HEIGHT],
+    [0, 0, WIDTH, 20],
+    [0, HEIGHT - 20, WIDTH, HEIGHT],
+
+    # ściana środkowa - część górna
+    [
+        middle_x - 20,
+        20,
+        middle_x + 20,
+        door_bottom
+    ],
+
+    # ściana środkowa - część dolna
+    [
+        middle_x - 20,
+        door_top,
+        middle_x + 20,
+        HEIGHT - 20
+    ]
+]
+def closest_point_rect(rect, point):
+
+    xmin, ymin, xmax, ymax = rect
+
+    x = np.clip(point[0], xmin, xmax)
+    y = np.clip(point[1], ymin, ymax)
+
+    return np.array([x, y])
+
+def inside_rect(rect, point):
+    xmin, ymin, xmax, ymax = rect
+
+    return (
+        xmin <= point[0] <= xmax
+        and
+        ymin <= point[1] <= ymax
+    )
+
+# ==========================
+# INICJALIZACJA
+# ==========================
+
+agents = [Agent() for _ in range(N_AGENTS)]
+
+# ==========================
+# SYMULACJA
+# ==========================
+plt.ion()
+
+fig, ax = plt.subplots(figsize=(12,7))
+
+
+for step in range(STEPS):
+
+
+    forces = []
+
+    # ----------------------
+    # Liczenie sił
+    # ----------------------
+
+    for agent in agents:
+
+        if agent.pos[0] < middle_x-50:
+            agent.goal = np.array([
+                middle_x-50,
+                HEIGHT/2
+        ])
+        else:
+            agent.goal = np.array([
+                WIDTH-100,
+                HEIGHT/2
+        ])
+
+        # ===== f_goal =====
+
+        goal_vec = agent.goal - agent.pos
+        dist_goal = np.linalg.norm(goal_vec)
+
+        if dist_goal > 1e-8:
+            goal_dir = goal_vec / dist_goal
+        else:
+            goal_dir = np.zeros(2)
+
+        f_goal = MASS * (
+            agent.desired_speed * goal_dir
+            - agent.vel
+        ) / TAU
+
+        # ===== f_rep =====
+
+        f_rep = np.zeros(2)
+
+        for other in agents:
+
+            if other is agent:
+                continue
+
+            dvec = agent.pos - other.pos
+            d = np.linalg.norm(dvec)
+
+            if d < 1e-8:
+                continue
+
+            n = dvec / d
+
+            f_rep += A * np.exp((R - d) / B) * n
+
+        # ===== f_wall =====
+
+        f_wall = np.zeros(2)
+
+        for wall in walls:
+
+            closest = closest_point_rect(
+                wall,
+                agent.pos
+            )
+
+            dvec = agent.pos - closest
+            d = np.linalg.norm(dvec)
+
+            if d < 1e-8:
+                continue
+
+            n = dvec / d
+
+            f_wall += (
+                A_WALL
+                * np.exp((R - d) / B_WALL)
+                * n
+            )
+
+        total_force = f_goal + f_rep + f_wall
+
+        forces.append(total_force)
+
+    # ----------------------
+    # Aktualizacja ruchu
+    # ----------------------
+
+    for agent, force in zip(agents, forces):
+
+        acc = force / MASS
+
+        agent.vel += acc * DT
+        agent.pos += agent.vel * DT
+        for wall in walls:
+
+            if inside_rect(wall, agent.pos):
+
+                xmin, ymin, xmax, ymax = wall
+
+                distances = [
+                    abs(agent.pos[0] - xmin),
+                    abs(agent.pos[0] - xmax),
+                    abs(agent.pos[1] - ymin),
+                    abs(agent.pos[1] - ymax)
+                ]
+
+                side = np.argmin(distances)
+
+                if side == 0:
+                    agent.pos[0] = xmin - 1
+                    agent.vel[0] = 0
+
+                elif side == 1:
+                    agent.pos[0] = xmax + 1
+                    agent.vel[0] = 0
+
+                elif side == 2:
+                    agent.pos[1] = ymin - 1
+                    agent.vel[1] = 0
+
+                else:
+                    agent.pos[1] = ymax + 1
+                    agent.vel[1] = 0
+        # nowy cel
+        # if np.linalg.norm(agent.pos - agent.goal) < 50:
+
+        #     agent.goal = np.array([
+        #         np.random.uniform(50, WIDTH - 50),
+        #         np.random.uniform(50, HEIGHT - 50)
+        #     ])
+
+        agent.trajectory.append(
+            agent.pos.copy()
+        )
+
+    for i in range(len(agents)):
+        for j in range(i + 1, len(agents)):
+
+            a = agents[i]
+            b = agents[j]
+
+            dvec = a.pos - b.pos
+            d = np.linalg.norm(dvec)
+
+            min_dist = 2 * AGENT_RADIUS
+
+            if d < min_dist and d > 1e-8:
+
+                n = dvec / d
+
+                overlap = min_dist - d
+
+                a.pos += n * overlap / 2
+                b.pos -= n * overlap / 2
+
+    ax.clear()
+
+    ax.set_xlim(0, WIDTH)
+    ax.set_ylim(0, HEIGHT)
+    for wall in walls:
+        xmin, ymin, xmax, ymax = wall
+
+        ax.add_patch(
+            Rectangle(
+                (xmin, ymin),
+                xmax - xmin,
+                ymax - ymin
+            )
+        )
+    pos = np.array([a.pos for a in agents])
+
+    ax.scatter(
+        pos[:,0],
+        pos[:,1],
+        s=40
+    )
+
+    ax.set_title(f"Step {step}")
+
+    plt.pause(0.001)
+
+plt.ioff()
+plt.show()
+
+# ==========================
+# WYKRES
+# ==========================
+
+plt.figure(figsize=(12, 7))
+
+for agent in agents:
+
+    traj = np.array(agent.trajectory)
+
+    plt.plot(
+        traj[:, 0],
+        traj[:, 1],
+        linewidth=1
+    )
+
+    plt.scatter(
+        traj[0, 0],
+        traj[0, 1],
+        s=20
+    )
+
+plt.xlim(0, WIDTH)
+plt.ylim(0, HEIGHT)
+
+plt.xlabel("x")
+plt.ylabel("y")
+
+plt.title(
+    f"Social Force Model ({N_AGENTS} agentów)"
+)
+
+plt.grid(True)
+
+plt.show()
