@@ -1,25 +1,31 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+
+import imageio.v2 as imageio
+import os
+
+frames = []
+os.makedirs("frames", exist_ok=True)
 # ==========================
 # PARAMETRY MODELU
 # ==========================
 
-N_AGENTS = 50
+N_AGENTS = 100
 
 MASS = 80.0
 
-R = 30
-A = 2000
-B = 15
+R = 24
+A = 3000
+B = 20
 
 A_WALL = 10000
 B_WALL = 30
 
 TAU = 0.3
 
-DT = 0.005
-STEPS = 2000
+DT = 0.01
+STEPS = 400
 
 WIDTH = 1100
 HEIGHT = 600
@@ -56,7 +62,7 @@ class Agent:
 # ŚCIANY
 # ==========================
 
-DOOR_WIDTH = 40
+DOOR_WIDTH = 30
 
 middle_x = WIDTH / 2
 
@@ -129,19 +135,15 @@ for step in range(STEPS):
     # ----------------------
 
     for agent in agents:
-
-        if agent.pos[0] < middle_x-50:
-            agent.goal = np.array([
-                middle_x-50,
-                HEIGHT/2
-        ])
+        if agent.pos[0] < middle_x - 50:
+            if agent.pos[1] > door_top:
+                agent.goal = np.array([middle_x - 30, door_top])
+            elif agent.pos[1] < door_bottom:
+                agent.goal = np.array([middle_x - 30, door_bottom])
+            else:
+                agent.goal = np.array([middle_x + 80, HEIGHT/2])
         else:
-            agent.goal = np.array([
-                WIDTH-100,
-                HEIGHT/2
-        ])
-
-        # ===== f_goal =====
+            agent.goal = np.array([WIDTH-100, HEIGHT/2])
 
         goal_vec = agent.goal - agent.pos
         dist_goal = np.linalg.norm(goal_vec)
@@ -299,12 +301,18 @@ for step in range(STEPS):
     )
 
     ax.set_title(f"Step {step}")
-
+    filename = f"frames/frame_{step:04d}.png"
+    plt.savefig(filename)
+    frames.append(imageio.imread(filename))
     plt.pause(0.001)
 
 plt.ioff()
 plt.show()
-
+imageio.mimsave(
+    "social_force.gif",
+    frames,
+    fps=50
+)
 # ==========================
 # WYKRES
 # ==========================
