@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle,Circle
 
 import imageio.v2 as imageio
 import os
@@ -292,13 +292,14 @@ for step in range(STEPS):
                 ymax - ymin
             )
         )
-    pos = np.array([a.pos for a in agents])
-
-    ax.scatter(
-        pos[:,0],
-        pos[:,1],
-        s=40
-    )
+    for agent in agents:
+        circle = Circle(
+            (agent.pos[0], agent.pos[1]),
+            AGENT_RADIUS,
+            fill=True,
+            alpha=0.9, color="r"
+        )
+        ax.add_patch(circle)
 
     ax.set_title(f"Step {step}")
     filename = f"frames/frame_{step:04d}.png"
