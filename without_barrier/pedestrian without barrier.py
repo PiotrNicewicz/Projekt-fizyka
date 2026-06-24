@@ -12,16 +12,16 @@ frames = []
 # PARAMETRY MODELU
 # ==========================
 
-N_AGENTS = 100
+N_AGENTS = 50
 
 MASS = 80.0
 
-R = 30
+R = 50
 A = 3000
 B = 20
 
-A_WALL = 10000
-B_WALL = 30
+A_WALL = 2000
+B_WALL = 50
 
 TAU = 0.3
 
@@ -63,13 +63,12 @@ class Agent:
 # ŚCIANY
 # ==========================
 
-DOOR_WIDTH = 30
-
+DOOR_WIDTH = 45
 middle_x = WIDTH / 2
 middle_y = HEIGHT / 2
 
 door_bottom = HEIGHT/2 - DOOR_WIDTH/2
-door_top = HEIGHT/2 + DOOR_WIDTH/2\
+door_top = HEIGHT/2 + DOOR_WIDTH/2
 
 walls = [
 
@@ -182,8 +181,8 @@ for step in range(STEPS):
                 continue
 
             n = dvec / d
-
-            f_rep += A * np.exp((R - d) / B) * n
+            effective_d = d - AGENT_RADIUS
+            f_rep += A * np.exp((R - effective_d) / B) * n
 
         # ===== f_wall =====
 
@@ -226,33 +225,40 @@ for step in range(STEPS):
         agent.pos += agent.vel * DT
         for wall in walls:
 
-            if inside_rect(wall, agent.pos):
+            xmin, ymin, xmax, ymax = wall
 
-                xmin, ymin, xmax, ymax = wall
+            expanded_wall = [
+                xmin - AGENT_RADIUS,
+                ymin - AGENT_RADIUS,
+                xmax + AGENT_RADIUS,
+                ymax + AGENT_RADIUS
+            ]
+
+            if inside_rect(expanded_wall, agent.pos):
 
                 distances = [
-                    abs(agent.pos[0] - xmin),
-                    abs(agent.pos[0] - xmax),
-                    abs(agent.pos[1] - ymin),
-                    abs(agent.pos[1] - ymax)
+                    abs(agent.pos[0] - (xmin - AGENT_RADIUS)),
+                    abs(agent.pos[0] - (xmax + AGENT_RADIUS)),
+                    abs(agent.pos[1] - (ymin - AGENT_RADIUS)),
+                    abs(agent.pos[1] - (ymax + AGENT_RADIUS))
                 ]
 
                 side = np.argmin(distances)
 
                 if side == 0:
-                    agent.pos[0] = xmin - 1
+                    agent.pos[0] = xmin - AGENT_RADIUS
                     agent.vel[0] = 0
 
                 elif side == 1:
-                    agent.pos[0] = xmax + 1
+                    agent.pos[0] = xmax + AGENT_RADIUS
                     agent.vel[0] = 0
 
                 elif side == 2:
-                    agent.pos[1] = ymin - 1
+                    agent.pos[1] = ymin - AGENT_RADIUS
                     agent.vel[1] = 0
 
                 else:
-                    agent.pos[1] = ymax + 1
+                    agent.pos[1] = ymax + AGENT_RADIUS
                     agent.vel[1] = 0
         # nowy cel
         # if np.linalg.norm(agent.pos - agent.goal) < 50:
@@ -315,7 +321,7 @@ for step in range(STEPS):
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
-        frames.append(Image.open(buf).convert("RGB"))
+        frames.append(Image.open(buf).copy())
     plt.pause(0.001)
 
 plt.ioff()
